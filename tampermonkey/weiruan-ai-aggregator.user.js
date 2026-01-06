@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         威软AI聚合
-// @namespace    https://weiruan.tech
+// @namespace    https://weiruan.org
 // @version      1.0.0
 // @description  聚合多个热门AI平台，支持API接口调用，多AI分工协作
 // @author       威软科技开发
