@@ -104,7 +104,7 @@ weiruan-AI/
 ## 联系方式
 
 - 作者：威软科技开发
-- Email：contact@weiruan.tech
+- Email：weiruan2025@gmail.com
 
 ---
 
