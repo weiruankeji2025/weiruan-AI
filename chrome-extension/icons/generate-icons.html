@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>威软AI聚合 - 图标生成器</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a2e; color: white; }
+        canvas { display: block; margin: 10px 0; border: 1px solid #333; }
+        a { color: #667eea; }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { color: #667eea; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>威软AI聚合 - 图标生成器</h1>
+        <p>点击下面的按钮下载各尺寸图标：</p>
+
+        <canvas id="canvas16" width="16" height="16"></canvas>
+        <a id="download16" download="icon16.png">下载 16x16</a>
+
+        <canvas id="canvas48" width="48" height="48"></canvas>
+        <a id="download48" download="icon48.png">下载 48x48</a>
+
+        <canvas id="canvas128" width="128" height="128"></canvas>
+        <a id="download128" download="icon128.png">下载 128x128</a>
+    </div>
+
+    <script>
+        function generateIcon(size) {
+            const canvas = document.getElementById('canvas' + size);
+            const ctx = canvas.getContext('2d');
+
+            // 创建渐变
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#667eea');
+            gradient.addColorStop(1, '#764ba2');
+
+            // 绘制圆角矩形
+            const radius = size / 5;
+            ctx.beginPath();
+            ctx.moveTo(radius, 0);
+            ctx.lineTo(size - radius, 0);
+            ctx.quadraticCurveTo(size, 0, size, radius);
+            ctx.lineTo(size, size - radius);
+            ctx.quadraticCurveTo(size, size, size - radius, size);
+            ctx.lineTo(radius, size);
+            ctx.quadraticCurveTo(0, size, 0, size - radius);
+            ctx.lineTo(0, radius);
+            ctx.quadraticCurveTo(0, 0, radius, 0);
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // 添加文字
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${size * 0.5}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('威', size / 2, size / 2 + size * 0.05);
+
+            // 设置下载链接
+            const downloadLink = document.getElementById('download' + size);
+            downloadLink.href = canvas.toDataURL('image/png');
+        }
+
+        // 生成所有尺寸
+        generateIcon(16);
+        generateIcon(48);
+        generateIcon(128);
+    </script>
+</body>
+</html>
