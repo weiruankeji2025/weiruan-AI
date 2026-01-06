@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>威软AI聚合</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">威</div>
+                <div class="logo-text">
+                    <h1>威软AI聚合</h1>
+                    <span class="subtitle">WeiRuan AI Aggregator</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 导航标签 -->
+        <nav class="tabs">
+            <button class="tab active" data-tab="chat">对话</button>
+            <button class="tab" data-tab="collab">协作</button>
+            <button class="tab" data-tab="settings">设置</button>
+            <button class="tab" data-tab="about">关于</button>
+        </nav>
+
+        <!-- 内容区域 -->
+        <main class="content">
+            <!-- 对话面板 -->
+            <section class="panel active" id="panel-chat">
+                <div class="platform-grid" id="platform-select"></div>
+                <div class="chat-area">
+                    <div class="messages" id="chat-messages">
+                        <div class="empty-state">
+                            <span class="empty-icon">💬</span>
+                            <p>选择一个AI平台开始对话</p>
+                        </div>
+                    </div>
+                    <div class="input-area">
+                        <textarea id="chat-input" placeholder="输入您的问题..." rows="2"></textarea>
+                        <button id="chat-send" class="btn-primary">
+                            <span class="btn-text">发送</span>
+                            <span class="btn-loading" style="display: none;">
+                                <span class="spinner"></span>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 协作面板 -->
+            <section class="panel" id="panel-collab">
+                <div class="form-group">
+                    <label class="form-label">项目/任务描述</label>
+                    <textarea id="collab-task" class="form-textarea"
+                        placeholder="描述您的项目或任务，多个AI将分工协作完成..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">选择参与协作的AI</label>
+                    <div class="checkbox-grid" id="collab-platforms"></div>
+                </div>
+                <button id="collab-start" class="btn-primary btn-full">
+                    <span class="btn-text">开始协作</span>
+                    <span class="btn-loading" style="display: none;">
+                        <span class="spinner"></span> 协作进行中...
+                    </span>
+                </button>
+                <div class="result-area" id="collab-result" style="display: none;">
+                    <h4>协作结果</h4>
+                    <pre id="collab-output"></pre>
+                </div>
+            </section>
+
+            <!-- 设置面板 -->
+            <section class="panel" id="panel-settings">
+                <div class="settings-section">
+                    <h3 class="section-title">API密钥配置</h3>
+                    <div id="api-settings"></div>
+                    <button id="save-settings" class="btn-primary btn-full">保存设置</button>
+                </div>
+            </section>
+
+            <!-- 关于面板 -->
+            <section class="panel" id="panel-about">
+                <div class="about-content">
+                    <div class="about-logo">威</div>
+                    <h2>威软AI聚合</h2>
+                    <p class="version">版本 1.0.0</p>
+                    <p class="description">
+                        威软AI聚合是一款强大的AI工具，聚合了多个热门AI平台，
+                        支持单独对话和多AI分工协作，帮助您高效完成各种任务。
+                    </p>
+                    <div class="features">
+                        <div class="feature">
+                            <span class="feature-icon">🌐</span>
+                            <div>
+                                <h4>多平台聚合</h4>
+                                <p>支持10+主流AI平台</p>
+                            </div>
+                        </div>
+                        <div class="feature">
+                            <span class="feature-icon">🤝</span>
+                            <div>
+                                <h4>智能协作</h4>
+                                <p>多AI分工协作</p>
+                            </div>
+                        </div>
+                        <div class="feature">
+                            <span class="feature-icon">🔌</span>
+                            <div>
+                                <h4>API接口</h4>
+                                <p>支持多种API平台</p>
+                            </div>
+                        </div>
+                        <div class="feature">
+                            <span class="feature-icon">🔒</span>
+                            <div>
+                                <h4>安全可靠</h4>
+                                <p>本地存储密钥</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="copyright">
+                        <p>© 2024 威软科技 - 修改代码需要作者许可</p>
+                        <p>作者：威软科技开发</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

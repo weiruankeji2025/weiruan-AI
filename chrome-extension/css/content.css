@@ -1,0 +1,178 @@
+/**
+ * 威软AI聚合 - Content Script 样式
+ * © 2024 威软科技 - 修改代码需要作者许可
+ * 作者：威软科技开发
+ */
+
+/* 浮动按钮 */
+#weiruan-ai-float-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+    cursor: pointer;
+    z-index: 2147483647;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+#weiruan-ai-float-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 30px rgba(102, 126, 234, 0.6);
+}
+
+.weiruan-float-icon {
+    color: white;
+    font-weight: bold;
+    font-size: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.weiruan-float-tooltip {
+    position: absolute;
+    right: 60px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+#weiruan-ai-float-btn:hover .weiruan-float-tooltip {
+    opacity: 1;
+}
+
+/* 快速查询面板 */
+#weiruan-ai-quick-panel {
+    position: fixed;
+    bottom: 90px;
+    right: 30px;
+    width: 360px;
+    max-height: 500px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    z-index: 2147483646;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.weiruan-quick-header {
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    padding: 14px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.weiruan-quick-title {
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.weiruan-quick-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+}
+
+.weiruan-quick-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.weiruan-quick-body {
+    padding: 16px;
+}
+
+.weiruan-quick-input {
+    width: 100%;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    color: white;
+    font-size: 13px;
+    resize: none;
+    min-height: 80px;
+    margin-bottom: 12px;
+    font-family: inherit;
+}
+
+.weiruan-quick-input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.weiruan-quick-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.weiruan-quick-send {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: white;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.weiruan-quick-send:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.weiruan-quick-result {
+    padding: 16px;
+    max-height: 250px;
+    overflow-y: auto;
+    color: white;
+    font-size: 13px;
+    line-height: 1.6;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.weiruan-quick-result:empty {
+    display: none;
+}
+
+/* 选中文本快捷按钮 */
+.weiruan-selection-btn {
+    position: fixed;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    z-index: 2147483645;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    transition: transform 0.2s;
+}
+
+.weiruan-selection-btn:hover {
+    transform: scale(1.05);
+}
