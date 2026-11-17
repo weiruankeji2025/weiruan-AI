@@ -141,88 +141,82 @@ class AIClient {
 
     async chat(messages, model = null, options = {}) {
         const selectedModel = model || this.config.defaultModel;
-
-        const headers = {
-            'Content-Type': 'application/json'
-        };
-
-        if (this.config.authType === 'Bearer') {
-            headers['Authorization'] = `Bearer ${this.apiKey}`;
-        } else if (this.config.authType === 'x-api-key') {
+        const streaming = typeof options.onDelta === 'function';
+        const headers = { 'Content-Type': 'application/json' };
+        if (this.config.authType === 'Bearer') headers.Authorization = 'Bearer ' + this.apiKey;
+        if (this.config.authType === 'x-api-key') {
             headers['x-api-key'] = this.apiKey;
             headers['anthropic-version'] = '2023-06-01';
         }
 
-        let body;
-        let endpoint = '/chat/completions';
-
-        if (this.platform === 'anthropic') {
-            endpoint = '/messages';
-            body = {
-                model: selectedModel,
-                max_tokens: options.maxTokens || 4096,
-                messages: messages.map(m => ({
-                    role: m.role === 'system' ? 'user' : m.role,
-                    content: m.content
-                }))
-            };
-        } else {
-            body = {
-                model: selectedModel,
-                messages: messages,
-                temperature: options.temperature || 0.7,
-                max_tokens: options.maxTokens || 4096,
-                stream: false
-            };
-        }
+        const body = this.platform === 'anthropic'
+            ? { model: selectedModel, max_tokens: options.maxTokens || 4096, stream: streaming,
+                messages: messages.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: m.content })) }
+            : { model: selectedModel, messages, temperature: options.temperature ?? 0.7,
+                max_tokens: options.maxTokens || 4096, stream: streaming };
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs ?? 60000);
-
+        const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs ?? 120000);
         try {
-            const response = await fetch(`${this.config.baseUrl}${endpoint}`, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(body),
-                signal: controller.signal
+            const endpoint = this.platform === 'anthropic' ? '/messages' : '/chat/completions';
+            const response = await fetch(this.config.baseUrl + endpoint, {
+                method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal
             });
 
-            const raw = await response.text();
-            let data = {};
-            try {
-                data = raw ? JSON.parse(raw) : {};
-            } catch {
-                throw new Error('服务商返回了无法解析的数据');
-            }
-
             if (!response.ok) {
-                throw new Error(data.error?.message || data.message || `HTTP ${response.status}`);
+                const raw = await response.text();
+                let errorData = {};
+                try { errorData = JSON.parse(raw); } catch {}
+                throw new Error(errorData.error?.message || errorData.message || ('HTTP ' + response.status));
             }
 
+            if (streaming && response.body && response.body.getReader) {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let content = '';
+                const handleLine = (line) => {
+                    const value = line.trim();
+                    if (!value.startsWith('data:')) return;
+                    const payload = value.slice(5).trim();
+                    if (!payload || payload === '[DONE]') return;
+                    let event;
+                    try { event = JSON.parse(payload); } catch { return; }
+                    let delta = '';
+                    if (this.platform === 'anthropic') {
+                        if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') delta = event.delta.text || '';
+                    } else {
+                        delta = event.choices?.[0]?.delta?.content || '';
+                        if (Array.isArray(delta)) delta = delta.map(part => part.text || '').join('');
+                    }
+                    if (delta) {
+                        content += delta;
+                        options.onDelta(delta);
+                    }
+                };
+                while (true) {
+                    const chunk = await reader.read();
+                    buffer += decoder.decode(chunk.value || new Uint8Array(), { stream: !chunk.done });
+                    const lines = buffer.split(/\r?\n/);
+                    buffer = lines.pop() || '';
+                    lines.forEach(handleLine);
+                    if (chunk.done) break;
+                }
+                if (buffer) handleLine(buffer);
+                if (!content.trim()) throw new Error('模型没有返回文本内容，请检查服务商是否支持流式输出');
+                return { success: true, content, model: selectedModel, platform: this.platform };
+            }
+
+            const data = await response.json();
             const content = this.platform === 'anthropic'
-                ? data.content?.filter(item => item.type === 'text').map(item => item.text).join('\\n')
+                ? data.content?.filter(item => item.type === 'text').map(item => item.text).join('\n')
                 : data.choices?.[0]?.message?.content;
-
-            if (typeof content !== 'string' || !content.trim()) {
-                throw new Error('服务商返回成功，但没有可显示的文本内容');
-            }
-
-            return {
-                success: true,
-                content,
-                model: selectedModel,
-                platform: this.platform,
-                usage: data.usage
-            };
+            if (typeof content !== 'string' || !content.trim()) throw new Error('服务商没有返回可显示的文本');
+            if (streaming) options.onDelta(content);
+            return { success: true, content, model: selectedModel, platform: this.platform, usage: data.usage };
         } catch (error) {
-            const message = error.name === 'AbortError'
-                ? '请求超时（60秒），请检查网络或稍后重试'
-                : (error.message || '网络请求失败');
-            throw {
-                success: false,
-                error: message,
-                platform: this.platform
-            };
+            const message = error.name === 'AbortError' ? '请求超时（120秒），请检查网络后重试' : (error.message || '网络请求失败');
+            throw { success: false, error: message, platform: this.platform };
         } finally {
             clearTimeout(timeoutId);
         }
