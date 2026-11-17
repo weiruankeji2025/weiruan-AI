@@ -3,135 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>威软AI聚合</title>
+    <meta name="color-scheme" content="light">
+    <title>威软 AI 工作台</title>
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-    <div class="container">
-        <!-- 头部 -->
+    <div class="app-shell">
         <header class="header">
-            <div class="logo">
-                <div class="logo-icon">威</div>
-                <div class="logo-text">
-                    <h1>威软AI聚合</h1>
-                    <span class="subtitle">WeiRuan AI Aggregator</span>
-                </div>
+            <div class="brand">
+                <div class="brand-mark">威</div>
+                <div><h1>威软 AI 工作台</h1><p>WeiRuan AI · 多模型聚合</p></div>
             </div>
+            <span class="header-status"><i></i> 本地安全连接</span>
         </header>
-
-        <!-- 导航标签 -->
-        <nav class="tabs">
-            <button class="tab active" data-tab="chat">对话</button>
-            <button class="tab" data-tab="collab">协作</button>
-            <button class="tab" data-tab="settings">设置</button>
+        <nav class="tabs" aria-label="主导航">
+            <button class="tab active" data-tab="chat">AI 对话</button>
+            <button class="tab" data-tab="collab">智能协作</button>
+            <button class="tab" data-tab="settings">模型设置</button>
             <button class="tab" data-tab="about">关于</button>
         </nav>
-
-        <!-- 内容区域 -->
         <main class="content">
-            <!-- 对话面板 -->
             <section class="panel active" id="panel-chat">
-                <div class="platform-grid" id="platform-select"></div>
+                <div class="chat-heading">
+                    <div><span class="eyebrow">CONVERSATION</span><h2>和 AI 开始对话</h2></div>
+                    <button id="chat-new" class="btn-secondary">＋ 新对话</button>
+                </div>
+                <div class="history-toolbar">
+                    <label for="history-select">最近对话</label>
+                    <select id="history-select" aria-label="选择历史对话"></select>
+                    <button id="chat-clear" class="icon-button" title="清空当前对话">清空</button>
+                </div>
+                <div class="model-section">
+                    <div class="section-caption">选择模型</div>
+                    <div class="platform-grid" id="platform-select"></div>
+                </div>
                 <div class="chat-area">
-                    <div class="messages" id="chat-messages">
-                        <div class="empty-state">
-                            <span class="empty-icon">💬</span>
-                            <p>选择一个AI平台开始对话</p>
-                        </div>
+                    <div class="messages" id="chat-messages" aria-live="polite">
+                        <div class="empty-state"><span class="empty-icon">✦</span><p>选择 AI 模型，开始一场新对话</p><small>聊天记录会自动保存在本地</small></div>
                     </div>
-                    <div class="input-area">
-                        <textarea id="chat-input" placeholder="输入您的问题..." rows="2"></textarea>
-                        <button id="chat-send" class="btn-primary">
-                            <span class="btn-text">发送</span>
-                            <span class="btn-loading" style="display: none;">
-                                <span class="spinner"></span>
-                            </span>
-                        </button>
+                    <div class="input-card">
+                        <textarea id="chat-input" placeholder="输入问题…（Enter 发送，Shift + Enter 换行）" rows="2"></textarea>
+                        <div class="input-footer"><span>AI 生成内容仅供参考</span><button id="chat-send" class="btn-primary">发送 <span>↑</span></button></div>
                     </div>
                 </div>
             </section>
-
-            <!-- 协作面板 -->
             <section class="panel" id="panel-collab">
-                <div class="form-group">
-                    <label class="form-label">项目/任务描述</label>
-                    <textarea id="collab-task" class="form-textarea"
-                        placeholder="描述您的项目或任务，多个AI将分工协作完成..."></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">选择参与协作的AI</label>
-                    <div class="checkbox-grid" id="collab-platforms"></div>
-                </div>
-                <button id="collab-start" class="btn-primary btn-full">
-                    <span class="btn-text">开始协作</span>
-                    <span class="btn-loading" style="display: none;">
-                        <span class="spinner"></span> 协作进行中...
-                    </span>
-                </button>
-                <div class="result-area" id="collab-result" style="display: none;">
-                    <h4>协作结果</h4>
-                    <pre id="collab-output"></pre>
-                </div>
+                <div class="section-heading"><span class="eyebrow">MULTI-AGENT</span><h2>多 AI 智能协作</h2><p>把复杂任务拆分给多个模型，并行处理后自动汇总。</p></div>
+                <div class="form-group"><label class="form-label" for="collab-task">项目 / 任务描述</label><textarea id="collab-task" class="form-textarea" placeholder="例如：分析一个 SaaS 产品的市场、竞品、技术方案和商业模式…"></textarea></div>
+                <div class="form-group"><label class="form-label">选择参与协作的 AI</label><div class="checkbox-grid" id="collab-platforms"></div></div>
+                <button id="collab-start" class="btn-primary btn-full">开始协作</button>
+                <div class="result-area" id="collab-result" style="display:none"><h4>协作结果</h4><pre id="collab-output"></pre></div>
             </section>
-
-            <!-- 设置面板 -->
             <section class="panel" id="panel-settings">
-                <div class="settings-section">
-                    <h3 class="section-title">API密钥配置</h3>
-                    <div id="api-settings"></div>
-                    <button id="save-settings" class="btn-primary btn-full">保存设置</button>
-                </div>
+                <div class="section-heading"><span class="eyebrow">CONFIGURATION</span><h2>模型与 API 设置</h2><p>API 密钥保存在当前浏览器的本地扩展存储中。</p></div>
+                <div class="settings-section"><div id="api-settings"></div><button id="save-settings" class="btn-primary btn-full">保存设置</button></div>
             </section>
-
-            <!-- 关于面板 -->
             <section class="panel" id="panel-about">
-                <div class="about-content">
-                    <div class="about-logo">威</div>
-                    <h2>威软AI聚合</h2>
-                    <p class="version">版本 1.0.0</p>
-                    <p class="description">
-                        威软AI聚合是一款强大的AI工具，聚合了多个热门AI平台，
-                        支持单独对话和多AI分工协作，帮助您高效完成各种任务。
-                    </p>
-                    <div class="features">
-                        <div class="feature">
-                            <span class="feature-icon">🌐</span>
-                            <div>
-                                <h4>多平台聚合</h4>
-                                <p>支持10+主流AI平台</p>
-                            </div>
-                        </div>
-                        <div class="feature">
-                            <span class="feature-icon">🤝</span>
-                            <div>
-                                <h4>智能协作</h4>
-                                <p>多AI分工协作</p>
-                            </div>
-                        </div>
-                        <div class="feature">
-                            <span class="feature-icon">🔌</span>
-                            <div>
-                                <h4>API接口</h4>
-                                <p>支持多种API平台</p>
-                            </div>
-                        </div>
-                        <div class="feature">
-                            <span class="feature-icon">🔒</span>
-                            <div>
-                                <h4>安全可靠</h4>
-                                <p>本地存储密钥</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="copyright">
-                        <p>© 2024 威软科技 - 修改代码需要作者许可</p>
-                        <p>作者：威软科技开发</p>
-                    </div>
-                </div>
+                <div class="about-content"><div class="about-logo">威</div><h2>威软 AI 聚合</h2><p class="version">版本 1.1.0 · WeiRuan Technology</p><p class="description">聚合多个主流 AI 平台，支持实时流式对话、聊天历史和多 AI 分工协作，帮助你更高效地完成工作。</p><div class="copyright">© 2024 威软科技 · 作者：威软科技开发</div></div>
             </section>
         </main>
+        <footer class="app-footer"><span>WEIRUAN AI</span><span>让多个 AI 一起工作</span></footer>
     </div>
-
     <script src="popup.js"></script>
 </body>
 </html>
