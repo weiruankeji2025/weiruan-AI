@@ -341,259 +341,298 @@ class UIController {
     constructor() {
         this.selectedPlatform = null;
         this.collaborationEngine = new CollaborationEngine();
+        this.sessions = [];
+        this.currentSessionId = null;
+        this.isSending = false;
         this.init();
     }
 
     async init() {
         await this.renderPlatforms();
         await this.renderSettings();
+        await this.loadSessions();
         this.bindEvents();
-
-        // 将右键菜单传入的选中文本带入输入框，并立即清理暂存数据
-        chrome.storage.local.get(['selectedText'], (result) => {
+        chrome.storage.local.get(['selectedText'], result => {
             if (result.selectedText) {
-                const input = document.getElementById('chat-input');
-                input.value = result.selectedText;
+                document.getElementById('chat-input').value = result.selectedText;
                 chrome.storage.local.remove('selectedText');
-                input.focus();
             }
         });
     }
 
+    async loadSessions() {
+        this.sessions = await StorageManager.get('chatSessions', []);
+        if (!Array.isArray(this.sessions)) this.sessions = [];
+        if (this.sessions.length) this.currentSessionId = this.sessions[0].id;
+        else this.createNewChat(false);
+        this.renderHistory();
+        this.renderMessages();
+    }
+
+    getCurrentSession() {
+        return this.sessions.find(item => item.id === this.currentSessionId) || null;
+    }
+
+    async persistSessions() {
+        this.sessions.sort((a, b) => b.updatedAt - a.updatedAt);
+        this.sessions = this.sessions.slice(0, 50).map(item => ({
+            ...item, messages: (item.messages || []).slice(-80)
+        }));
+        await StorageManager.set('chatSessions', this.sessions);
+        this.renderHistory();
+    }
+
+    createNewChat(persist = true) {
+        const id = 'chat-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+        this.sessions.unshift({ id, title: '新对话', platform: this.selectedPlatform, messages: [], updatedAt: Date.now() });
+        this.currentSessionId = id;
+        this.renderMessages();
+        this.renderHistory();
+        if (persist) this.persistSessions();
+    }
+
+    switchConversation(id) {
+        if (!this.sessions.some(item => item.id === id)) return;
+        this.currentSessionId = id;
+        const session = this.getCurrentSession();
+        this.selectedPlatform = session.platform || null;
+        document.querySelectorAll('.platform-btn').forEach(button => {
+            button.classList.toggle('selected', button.dataset.platform === this.selectedPlatform);
+        });
+        this.renderMessages();
+        this.renderHistory();
+    }
+
+    async clearCurrentChat() {
+        const session = this.getCurrentSession();
+        if (!session) return;
+        session.messages = [];
+        session.title = '新对话';
+        session.updatedAt = Date.now();
+        await this.persistSessions();
+        this.renderMessages();
+    }
+
+    renderHistory() {
+        const select = document.getElementById('history-select');
+        if (!select) return;
+        select.replaceChildren();
+        this.sessions.forEach(session => {
+            const option = document.createElement('option');
+            option.value = session.id;
+            option.textContent = (session.title || '新对话') + ' · ' + new Date(session.updatedAt).toLocaleDateString();
+            option.selected = session.id === this.currentSessionId;
+            select.appendChild(option);
+        });
+    }
+
+    appendMessage(role, content, platform) {
+        const container = document.getElementById('chat-messages');
+        const article = document.createElement('article');
+        article.className = 'message ' + (role === 'user' ? 'user' : 'assistant');
+        if (role !== 'user') {
+            const meta = document.createElement('div');
+            meta.className = 'message-platform';
+            meta.textContent = CONFIG.platforms[platform || this.selectedPlatform]?.name || 'AI 助手';
+            article.appendChild(meta);
+        }
+        const body = document.createElement('div');
+        body.className = 'message-content';
+        body.textContent = content || '';
+        article.appendChild(body);
+        container.appendChild(article);
+        container.scrollTop = container.scrollHeight;
+        return body;
+    }
+
+    renderMessages() {
+        const container = document.getElementById('chat-messages');
+        const session = this.getCurrentSession();
+        container.replaceChildren();
+        if (!session || !session.messages || !session.messages.length) {
+            const empty = document.createElement('div');
+            empty.className = 'empty-state';
+            const icon = document.createElement('span');
+            icon.className = 'empty-icon';
+            icon.textContent = '✦';
+            const title = document.createElement('p');
+            title.textContent = '选择 AI 模型，开始一场新对话';
+            const hint = document.createElement('small');
+            hint.textContent = '聊天记录会自动保存在本地';
+            empty.append(icon, title, hint);
+            container.appendChild(empty);
+            return;
+        }
+        session.messages.forEach(item => this.appendMessage(item.role, item.content, item.platform));
+        container.scrollTop = container.scrollHeight;
+    }
+
     async renderPlatforms() {
         const apiKeys = await StorageManager.getApiKeys();
-
-        // 渲染聊天平台选择
         const platformSelect = document.getElementById('platform-select');
-        platformSelect.innerHTML = Object.entries(CONFIG.platforms).map(([key, platform]) => `
-            <button class="platform-btn ${apiKeys[key] ? '' : 'disabled'}"
-                    data-platform="${key}"
-                    ${apiKeys[key] ? '' : 'disabled'}>
-                ${platform.name}
-            </button>
-        `).join('');
-
-        // 渲染协作平台选择
+        platformSelect.innerHTML = Object.entries(CONFIG.platforms).map(([key, platform]) =>
+            '<button class="platform-btn ' + (apiKeys[key] ? '' : 'disabled') + '" data-platform="' + key + '" ' +
+            (apiKeys[key] ? '' : 'disabled') + '>' + platform.name + '</button>'
+        ).join('');
         const collabPlatforms = document.getElementById('collab-platforms');
-        collabPlatforms.innerHTML = Object.entries(CONFIG.platforms).map(([key, platform]) => `
-            <div class="checkbox-item ${apiKeys[key] ? '' : 'disabled'}">
-                <input type="checkbox" id="collab-${key}" value="${key}"
-                    ${apiKeys[key] ? '' : 'disabled'}>
-                <label for="collab-${key}">${platform.name}</label>
-            </div>
-        `).join('');
+        collabPlatforms.innerHTML = Object.entries(CONFIG.platforms).map(([key, platform]) =>
+            '<label class="checkbox-item ' + (apiKeys[key] ? '' : 'disabled') + '">' +
+            '<input type="checkbox" id="collab-' + key + '" value="' + key + '" ' +
+            (apiKeys[key] ? '' : 'disabled') + '><span>' + platform.name + '</span></label>'
+        ).join('');
+        if (this.selectedPlatform) {
+            const selected = platformSelect.querySelector('[data-platform="' + this.selectedPlatform + '"]');
+            if (selected && !selected.disabled) selected.classList.add('selected');
+        }
     }
 
     async renderSettings() {
         const apiKeys = await StorageManager.getApiKeys();
         const apiSettings = document.getElementById('api-settings');
-
-        apiSettings.innerHTML = Object.entries(CONFIG.platforms).map(([key, platform]) => `
-            <div class="api-item">
-                <label>${platform.name}</label>
-                <input type="password" id="api-${key}"
-                    placeholder="输入API密钥"
-                    value="${apiKeys[key] || ''}">
-            </div>
-        `).join('');
+        apiSettings.innerHTML = Object.entries(CONFIG.platforms).map(([key, platform]) =>
+            '<div class="api-item"><label for="api-' + key + '">' + platform.name + '</label>' +
+            '<input type="password" id="api-' + key + '" autocomplete="off" placeholder="输入 API 密钥" ' +
+            'value="' + this.escapeAttribute(apiKeys[key] || '') + '"></div>'
+        ).join('');
     }
 
     bindEvents() {
-        // 标签切换
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
-        });
-
-        // 平台选择
-        document.getElementById('platform-select').addEventListener('click', (e) => {
-            if (e.target.classList.contains('platform-btn') && !e.target.classList.contains('disabled')) {
-                document.querySelectorAll('.platform-btn').forEach(btn => btn.classList.remove('selected'));
-                e.target.classList.add('selected');
-                this.selectedPlatform = e.target.dataset.platform;
+        document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => this.switchTab(tab.dataset.tab)));
+        document.getElementById('platform-select').addEventListener('click', event => {
+            const button = event.target.closest('.platform-btn');
+            if (!button || button.disabled) return;
+            this.selectedPlatform = button.dataset.platform;
+            document.querySelectorAll('.platform-btn').forEach(item => item.classList.toggle('selected', item === button));
+            const session = this.getCurrentSession();
+            if (session) {
+                session.platform = this.selectedPlatform;
+                this.persistSessions();
             }
         });
-
-        // 发送消息
         document.getElementById('chat-send').addEventListener('click', () => this.sendMessage());
-        document.getElementById('chat-input').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
+        document.getElementById('chat-input').addEventListener('keydown', event => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
                 this.sendMessage();
             }
         });
-
-        // 保存设置
+        document.getElementById('chat-new').addEventListener('click', () => this.createNewChat());
+        document.getElementById('history-select').addEventListener('change', event => this.switchConversation(event.target.value));
+        document.getElementById('chat-clear').addEventListener('click', () => this.clearCurrentChat());
         document.getElementById('save-settings').addEventListener('click', () => this.saveSettings());
-
-        // 开始协作
         document.getElementById('collab-start').addEventListener('click', () => this.startCollaboration());
     }
 
     switchTab(tabName) {
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.tab === tabName);
-        });
-        document.querySelectorAll('.panel').forEach(panel => {
-            panel.classList.toggle('active', panel.id === `panel-${tabName}`);
-        });
+        document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.tab === tabName));
+        document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === 'panel-' + tabName));
     }
 
     async sendMessage() {
+        if (this.isSending) return;
         const input = document.getElementById('chat-input');
         const message = input.value.trim();
-
         if (!message) return;
         if (!this.selectedPlatform) {
-            alert('请先选择一个AI平台');
+            this.switchTab('settings');
+            alert('请先配置 API 密钥，并选择一个 AI 平台。');
             return;
         }
-
         const apiKeys = await StorageManager.getApiKeys();
         if (!apiKeys[this.selectedPlatform]) {
-            alert('请先配置该平台的API密钥');
+            this.switchTab('settings');
+            alert('请先配置该平台的 API 密钥。');
             return;
         }
 
-        const messagesDiv = document.getElementById('chat-messages');
-        const sendBtn = document.getElementById('chat-send');
-
-        // 清除空状态
-        const emptyState = messagesDiv.querySelector('.empty-state');
-        if (emptyState) emptyState.remove();
-
-        // 添加用户消息
-        messagesDiv.innerHTML += `
-            <div class="message user">${this.escapeHtml(message)}</div>
-        `;
-
+        if (!this.getCurrentSession()) this.createNewChat(false);
+        const session = this.getCurrentSession();
+        session.platform = this.selectedPlatform;
+        if (!session.messages.length) session.title = message.slice(0, 28);
+        session.messages.push({ role: 'user', content: message, platform: this.selectedPlatform, time: Date.now() });
+        this.appendMessage('user', message);
+        const assistantBody = this.appendMessage('assistant', '正在连接模型…', this.selectedPlatform);
         input.value = '';
 
-        // 显示加载状态
-        const loadingId = 'loading-' + Date.now();
-        messagesDiv.innerHTML += `
-            <div class="message assistant" id="${loadingId}">
-                <div class="message-platform">${CONFIG.platforms[this.selectedPlatform].name}</div>
-                <span class="spinner"></span> 正在思考...
-            </div>
-        `;
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-        sendBtn.disabled = true;
-        sendBtn.querySelector('.btn-text').style.display = 'none';
-        sendBtn.querySelector('.btn-loading').style.display = 'flex';
-
+        const sendButton = document.getElementById('chat-send');
+        this.isSending = true;
+        sendButton.disabled = true;
+        sendButton.innerHTML = '生成中…';
+        let answer = '';
         try {
             const client = new AIClient(this.selectedPlatform, apiKeys[this.selectedPlatform]);
-            const response = await client.chat([{ role: 'user', content: message }]);
-
-            const loadingEl = document.getElementById(loadingId);
-            if (loadingEl) {
-                loadingEl.innerHTML = `
-                    <div class="message-platform">${CONFIG.platforms[this.selectedPlatform].name}</div>
-                    ${this.escapeHtml(response.content)}
-                `;
-            }
+            const history = session.messages.slice(-21).map(item => ({ role: item.role, content: item.content }));
+            await client.chat(history, null, {
+                onDelta: delta => {
+                    answer += delta;
+                    assistantBody.textContent = answer;
+                    const messages = document.getElementById('chat-messages');
+                    messages.scrollTop = messages.scrollHeight;
+                }
+            });
+            if (!answer.trim()) throw new Error('模型未返回内容');
+            session.messages.push({ role: 'assistant', content: answer, platform: this.selectedPlatform, time: Date.now() });
         } catch (error) {
-            const loadingEl = document.getElementById(loadingId);
-            if (loadingEl) {
-                loadingEl.innerHTML = `
-                    <div class="message-platform">${CONFIG.platforms[this.selectedPlatform].name}</div>
-                    <span style="color: #ff6b6b;">错误: ${error.error || error.message || '请求失败'}</span>
-                `;
-            }
+            const errorText = error.error || error.message || '请求失败';
+            assistantBody.textContent = '请求失败：' + errorText;
+            session.messages.push({ role: 'assistant', content: '请求失败：' + errorText, platform: this.selectedPlatform, time: Date.now() });
+        } finally {
+            session.updatedAt = Date.now();
+            await this.persistSessions();
+            this.isSending = false;
+            sendButton.disabled = false;
+            sendButton.textContent = '发送 ↑';
+            input.focus();
         }
-
-        sendBtn.disabled = false;
-        sendBtn.querySelector('.btn-text').style.display = 'inline';
-        sendBtn.querySelector('.btn-loading').style.display = 'none';
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
     async startCollaboration() {
-        const taskInput = document.getElementById('collab-task');
-        const task = taskInput.value.trim();
-
-        if (!task) {
-            alert('请输入项目或任务描述');
-            return;
-        }
-
-        const selectedPlatforms = [];
-        document.querySelectorAll('#collab-platforms input:checked').forEach(cb => {
-            selectedPlatforms.push(cb.value);
-        });
-
-        if (selectedPlatforms.length < 2) {
-            alert('请至少选择2个AI平台进行协作');
-            return;
-        }
-
+        const task = document.getElementById('collab-task').value.trim();
+        if (!task) return alert('请输入项目或任务描述');
+        const selectedPlatforms = Array.from(document.querySelectorAll('#collab-platforms input:checked')).map(input => input.value);
+        if (selectedPlatforms.length < 2) return alert('请至少选择2个 AI 平台进行协作');
         const resultDiv = document.getElementById('collab-result');
         const outputDiv = document.getElementById('collab-output');
-        const startBtn = document.getElementById('collab-start');
-
+        const startButton = document.getElementById('collab-start');
         resultDiv.style.display = 'block';
-        outputDiv.textContent = '正在分解任务并分配给各AI...\n';
-
-        startBtn.disabled = true;
-        startBtn.querySelector('.btn-text').style.display = 'none';
-        startBtn.querySelector('.btn-loading').style.display = 'flex';
-
+        outputDiv.textContent = '正在分解任务并分配给各 AI…';
+        startButton.disabled = true;
         try {
             const result = await this.collaborationEngine.executeCollaboration(task, selectedPlatforms);
-
-            let output = '=== 任务分解 ===\n';
-            result.subtasks.forEach((st, i) => {
-                output += `${i + 1}. ${st.title}\n`;
-            });
-
-            output += '\n=== 各AI完成情况 ===\n';
-            result.results.forEach(r => {
-                output += `\n【${CONFIG.platforms[r.platform].name}】${r.task.title}\n`;
-                output += `${r.response.content}\n`;
-                output += '---\n';
-            });
-
-            output += '\n=== 汇总报告 ===\n';
-            output += result.summary;
-
+            let output = '=== 任务分解 ===\n' + result.subtasks.map((item, index) => (index + 1) + '. ' + item.title).join('\n');
+            output += '\n\n=== 各 AI 完成情况 ===\n';
+            result.results.forEach(item => { output += '\n【' + CONFIG.platforms[item.platform].name + '】' + item.task.title + '\n' + item.response.content + '\n'; });
+            if (result.failures && result.failures.length) output += '\n部分任务失败：\n' + result.failures.map(item => item.message).join('\n');
+            output += '\n=== 汇总报告 ===\n' + result.summary;
             outputDiv.textContent = output;
         } catch (error) {
-            outputDiv.textContent = `协作失败: ${error.message || error}`;
+            outputDiv.textContent = '协作失败：' + (error.message || error);
+        } finally {
+            startButton.disabled = false;
         }
-
-        startBtn.disabled = false;
-        startBtn.querySelector('.btn-text').style.display = 'inline';
-        startBtn.querySelector('.btn-loading').style.display = 'none';
     }
 
     async saveSettings() {
         const apiKeys = await StorageManager.getApiKeys();
-
-        // 一次性写入，允许清空密钥，避免逐个平台重复读写存储
         for (const key of Object.keys(CONFIG.platforms)) {
-            const input = document.getElementById(`api-${key}`);
-            if (input) {
-                const value = input.value.trim();
-                if (value) apiKeys[key] = value;
-                else delete apiKeys[key];
-            }
+            const input = document.getElementById('api-' + key);
+            if (!input) continue;
+            const value = input.value.trim();
+            if (value) apiKeys[key] = value;
+            else delete apiKeys[key];
         }
-
         await StorageManager.set('apiKeys', apiKeys);
-        if (this.selectedPlatform && !apiKeys[this.selectedPlatform]) {
-            this.selectedPlatform = null;
-        }
+        if (this.selectedPlatform && !apiKeys[this.selectedPlatform]) this.selectedPlatform = null;
         await this.renderPlatforms();
-        const saveButton = document.getElementById('save-settings');
-        saveButton.textContent = '已保存 ✓';
-        setTimeout(() => { saveButton.textContent = '保存设置'; }, 1800);
+        const button = document.getElementById('save-settings');
+        button.textContent = '已保存 ✓';
+        setTimeout(() => { button.textContent = '保存设置'; }, 1600);
     }
 
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML.replace(/\n/g, '<br>');
+    escapeAttribute(value) {
+        return String(value).replace(/[&"'<>]/g, char => ({
+            '&': '&amp;', '"': '&quot;', "'": '&#39;', '<': '&lt;', '>': '&gt;'
+        })[char]);
     }
 }
 
