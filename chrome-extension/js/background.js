@@ -96,4 +96,13 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     }
 });
 
+// 使用扩展快捷键打开弹窗，避免向每个网页注入内容脚本
+chrome.commands.onCommand.addListener((command) => {
+    if (command === 'open-ai-panel') {
+        chrome.action.openPopup().catch((error) => {
+            console.warn('无法打开威软AI弹窗:', error);
+        });
+    }
+});
+
 console.log('威软AI聚合 - 后台服务已启动');
