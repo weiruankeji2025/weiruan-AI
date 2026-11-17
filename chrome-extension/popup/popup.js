@@ -170,7 +170,7 @@ class AIClient {
                 throw new Error(errorData.error?.message || errorData.message || ('HTTP ' + response.status));
             }
 
-            if (streaming && response.body && response.body.getReader) {
+            if (streaming && response.body && response.body.getReader && (response.headers.get('content-type') || '').includes('text/event-stream')) {
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
@@ -365,6 +365,10 @@ class UIController {
         if (!Array.isArray(this.sessions)) this.sessions = [];
         if (this.sessions.length) this.currentSessionId = this.sessions[0].id;
         else this.createNewChat(false);
+        this.selectedPlatform = this.getCurrentSession()?.platform || null;
+        document.querySelectorAll('.platform-btn').forEach(button => {
+            button.classList.toggle('selected', button.dataset.platform === this.selectedPlatform);
+        });
         this.renderHistory();
         this.renderMessages();
     }
