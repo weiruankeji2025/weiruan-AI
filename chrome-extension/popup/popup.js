@@ -176,38 +176,55 @@ class AIClient {
             };
         }
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs ?? 60000);
+
         try {
             const response = await fetch(`${this.config.baseUrl}${endpoint}`, {
                 method: 'POST',
                 headers: headers,
-                body: JSON.stringify(body)
+                body: JSON.stringify(body),
+                signal: controller.signal
             });
 
-            const data = await response.json();
-
-            if (response.ok) {
-                let content;
-                if (this.platform === 'anthropic') {
-                    content = data.content[0].text;
-                } else {
-                    content = data.choices[0].message.content;
-                }
-                return {
-                    success: true,
-                    content: content,
-                    model: selectedModel,
-                    platform: this.platform,
-                    usage: data.usage
-                };
-            } else {
-                throw new Error(data.error?.message || '请求失败');
+            const raw = await response.text();
+            let data = {};
+            try {
+                data = raw ? JSON.parse(raw) : {};
+            } catch {
+                throw new Error('服务商返回了无法解析的数据');
             }
+
+            if (!response.ok) {
+                throw new Error(data.error?.message || data.message || `HTTP ${response.status}`);
+            }
+
+            const content = this.platform === 'anthropic'
+                ? data.content?.filter(item => item.type === 'text').map(item => item.text).join('\\n')
+                : data.choices?.[0]?.message?.content;
+
+            if (typeof content !== 'string' || !content.trim()) {
+                throw new Error('服务商返回成功，但没有可显示的文本内容');
+            }
+
+            return {
+                success: true,
+                content,
+                model: selectedModel,
+                platform: this.platform,
+                usage: data.usage
+            };
         } catch (error) {
+            const message = error.name === 'AbortError'
+                ? '请求超时（60秒），请检查网络或稍后重试'
+                : (error.message || '网络请求失败');
             throw {
                 success: false,
-                error: error.message || '网络请求失败',
+                error: message,
                 platform: this.platform
             };
+        } finally {
+            clearTimeout(timeoutId);
         }
     }
 }
@@ -233,7 +250,15 @@ class CollaborationEngine {
             const response = await decomposer.chat([{ role: 'user', content: prompt }]);
             const jsonMatch = response.content.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
-                return JSON.parse(jsonMatch[0]).subtasks;
+                const parsed = JSON.parse(jsonMatch[0]);
+                if (Array.isArray(parsed.subtasks) && parsed.subtasks.length > 0) {
+                    return parsed.subtasks.slice(0, 8).map((task, index) => ({
+                        id: task.id ?? index + 1,
+                        title: String(task.title || `子任务 ${index + 1}`),
+                        description: String(task.description || task.title || ''),
+                        expertise: String(task.expertise || 'general')
+                    }));
+                }
             }
         } catch (e) {
             console.error('任务分解失败:', e);
@@ -285,6 +310,16 @@ class CollaborationEngine {
         const completedResults = results
             .filter(r => r.status === 'fulfilled')
             .map(r => r.value);
+        const failures = results
+            .filter(r => r.status === 'rejected')
+            .map((r, index) => ({
+                message: r.reason?.error || r.reason?.message || '未知错误',
+                index: index + 1
+            }));
+
+        if (completedResults.length === 0) {
+            throw new Error(failures.map(item => item.message).join('；') || '所有协作任务均未成功');
+        }
 
         const summaryClient = aiClients[0];
         const summaryPrompt = `请汇总以下子任务结果：
@@ -301,6 +336,7 @@ ${r.response.content}
         return {
             subtasks: subtasks,
             results: completedResults,
+            failures,
             summary: summary.content
         };
     }
@@ -318,6 +354,16 @@ class UIController {
         await this.renderPlatforms();
         await this.renderSettings();
         this.bindEvents();
+
+        // 将右键菜单传入的选中文本带入输入框，并立即清理暂存数据
+        chrome.storage.local.get(['selectedText'], (result) => {
+            if (result.selectedText) {
+                const input = document.getElementById('chat-input');
+                input.value = result.selectedText;
+                chrome.storage.local.remove('selectedText');
+                input.focus();
+            }
+        });
     }
 
     async renderPlatforms() {
@@ -528,15 +574,26 @@ class UIController {
     }
 
     async saveSettings() {
+        const apiKeys = await StorageManager.getApiKeys();
+
+        // 一次性写入，允许清空密钥，避免逐个平台重复读写存储
         for (const key of Object.keys(CONFIG.platforms)) {
             const input = document.getElementById(`api-${key}`);
-            if (input && input.value) {
-                await StorageManager.setApiKey(key, input.value);
+            if (input) {
+                const value = input.value.trim();
+                if (value) apiKeys[key] = value;
+                else delete apiKeys[key];
             }
         }
 
+        await StorageManager.set('apiKeys', apiKeys);
+        if (this.selectedPlatform && !apiKeys[this.selectedPlatform]) {
+            this.selectedPlatform = null;
+        }
         await this.renderPlatforms();
-        alert('设置已保存！');
+        const saveButton = document.getElementById('save-settings');
+        saveButton.textContent = '已保存 ✓';
+        setTimeout(() => { saveButton.textContent = '保存设置'; }, 1800);
     }
 
     escapeHtml(text) {
